@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, ReactNode } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
 
 export type UserRole = "user" | "admin";
 
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
 
   const mapUser = useCallback(async (sbUser: SupabaseUser | null) => {
     if (!sbUser) return null;
@@ -76,7 +78,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void init();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT") {
+        if (mounted) {
+          setUser(null);
+          setIsLoading(false);
+        }
+        router.refresh();
+        return;
+      }
+
+      if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN" || event === "USER_UPDATED") {
+        const mapped = await mapUser(session?.user ?? null);
+        if (mounted) {
+          setUser(mapped);
+          setIsLoading(false);
+        }
+        router.refresh();
+        return;
+      }
+
       const mapped = await mapUser(session?.user ?? null);
       if (mounted) {
         setUser(mapped);
@@ -88,7 +109,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [mapUser, supabase]);
+  }, [mapUser, router, supabase]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const recover = async () => {
+      if (isLoading) return;
+      if (user) return;
+
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (data.user) {
+          const mapped = await mapUser(data.user);
+          if (!cancelled) {
+            setUser(mapped);
+            router.refresh();
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    void recover();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, mapUser, router, supabase, user]);
+
+  useEffect(() => {
+    if (user?.role === "admin") {
+      router.refresh();
+    }
+  }, [router, user?.role]);
 
   const login = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });

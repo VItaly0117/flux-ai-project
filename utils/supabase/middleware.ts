@@ -4,19 +4,17 @@ import { NextResponse, type NextRequest } from "next/server";
 type CookieToSet = {
   name: string;
   value: string;
-  options?: Record<string, unknown>;
+  options?: Parameters<NextResponse["cookies"]["set"]>[2];
 };
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  let response = NextResponse.next({ request: { headers: request.headers } });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
-    return supabaseResponse;
+    return response;
   }
 
   const supabase = createServerClient(url, anonKey, {
@@ -25,11 +23,12 @@ export async function updateSession(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet: CookieToSet[]) {
-        supabaseResponse = NextResponse.next({
-          request,
-        });
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+
+        response = NextResponse.next({ request: { headers: request.headers } });
+
         cookiesToSet.forEach(({ name, value, options }) => {
-          supabaseResponse.cookies.set(name, value, options);
+          response.cookies.set(name, value, options);
         });
       },
     },
@@ -37,5 +36,5 @@ export async function updateSession(request: NextRequest) {
 
   await supabase.auth.getUser();
 
-  return supabaseResponse;
+  return response;
 }

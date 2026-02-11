@@ -86,8 +86,18 @@ export function Navigation() {
 
     void loadRole();
 
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        void loadRole();
+      }
+      if (event === "SIGNED_OUT") {
+        if (!cancelled) setIsAdmin(false);
+      }
+    });
+
     return () => {
       cancelled = true;
+      sub.subscription.unsubscribe();
     };
   }, [supabase, user?.id]);
 
