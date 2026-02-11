@@ -10,7 +10,7 @@ import { Mail, Lock, User, Sparkles } from "lucide-react";
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center px-4 py-12 text-zinc-300">Loading...</div>}>
+    <Suspense fallback={<div className="flex justify-center items-center h-screen">Loading...</div>}>
       <SignupForm />
     </Suspense>
   );
