@@ -1,6 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function applySecurityHeaders(response: NextResponse) {
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin");
+  return response;
+}
+
 type CookieToSet = {
   name: string;
   value: string;
@@ -9,20 +16,22 @@ type CookieToSet = {
 
 export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/auth/signout")) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
   }
 
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  let response = applySecurityHeaders(
+    NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    })
+  );
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
-    return response;
+    return applySecurityHeaders(response);
   }
 
   const supabase = createServerClient(url, anonKey, {
@@ -32,9 +41,11 @@ export async function middleware(request: NextRequest) {
       },
       setAll(cookiesToSet: CookieToSet[]) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({
-          request,
-        });
+        response = applySecurityHeaders(
+          NextResponse.next({
+            request,
+          })
+        );
         cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       },
     },
@@ -54,18 +65,20 @@ export async function middleware(request: NextRequest) {
     !user &&
     (request.nextUrl.pathname.startsWith("/admin") ||
       request.nextUrl.pathname.startsWith("/history") ||
-      request.nextUrl.pathname.startsWith("/saved"))
+      request.nextUrl.pathname.startsWith("/saved") ||
+      request.nextUrl.pathname.startsWith("/profile") ||
+      request.nextUrl.pathname.startsWith("/analyze"))
   ) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    return applySecurityHeaders(NextResponse.redirect(loginUrl));
   }
 
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup")) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return applySecurityHeaders(NextResponse.redirect(new URL("/", request.url)));
   }
 
-  return response;
+  return applySecurityHeaders(response);
 }
 
 export const config = {

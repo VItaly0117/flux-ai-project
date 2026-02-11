@@ -4,6 +4,8 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { AuthGuard } from "@/components/AuthGuard";
 import { LayoutClient } from "@/components/LayoutClient";
+import { GlobalLoader } from "@/components/GlobalLoader";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -11,8 +13,13 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "FLUX - AI Dating Assistant",
-  description: "Craft the perfect response instantly. Premium AI Dating Assistant SaaS.",
+  title: "FLUX - AI Image Generator",
+  description: "Create stunning visuals with the power of Flux AI.",
+  openGraph: {
+    title: "FLUX - AI Image Generator",
+    description: "Create stunning visuals with the power of Flux AI.",
+    type: "website",
+  },
 };
 
 export const viewport: Viewport = {
@@ -29,11 +36,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={spaceGrotesk.variable}>
       <body className="min-h-screen bg-[#020617] text-zinc-100 font-sans antialiased">
-        <AuthProvider>
-          <AuthGuard>
-            <LayoutClient>{children}</LayoutClient>
-          </AuthGuard>
-        </AuthProvider>
+        <GlobalLoader />
+        <ToastProvider>
+          <AuthProvider>
+            <AuthGuard>
+              <LayoutClient>{children}</LayoutClient>
+            </AuthGuard>
+          </AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   );
