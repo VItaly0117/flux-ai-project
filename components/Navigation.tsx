@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Home, History, Upload, User, Shield } from "lucide-react";
+import { Home, History, Upload, User, Shield, LogOut } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { createClient } from "@/utils/supabase/client";
 
 const baseNavItems = [
   { icon: Home, label: "Home", href: "/" },
@@ -48,9 +49,58 @@ function NavLink({ item, isMobile = false }: { item: (typeof baseNavItems)[0]; i
 
 export function Navigation() {
   const isDesktop = useIsDesktop();
+  const router = useRouter();
   const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
   const adminItem = { icon: Shield, label: "Admin", href: "/admin/dashboard" as const };
-  const navItems = user?.role === "admin" ? [...baseNavItems, adminItem] : baseNavItems;
+
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+
+    async function loadRole() {
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+
+        const sbUser = userData.user;
+        if (!sbUser) {
+          if (!cancelled) setIsAdmin(false);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", sbUser.id)
+          .maybeSingle<{ role: string | null }>();
+
+        const role = (profile?.role ?? "user").toString().toLowerCase();
+        if (!cancelled) setIsAdmin(role === "admin");
+      } catch {
+        if (!cancelled) setIsAdmin(false);
+      }
+    }
+
+    void loadRole();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const navItems = isAdmin ? [...baseNavItems, adminItem] : baseNavItems;
+
+  const handleSignOut = async () => {
+    if (user) {
+      const ok = window.confirm("Sign out?");
+      if (!ok) return;
+      window.location.assign("/auth/signout");
+      return;
+    }
+
+    router.replace("/login");
+  };
 
   return (
     <>
@@ -79,6 +129,14 @@ export function Navigation() {
 
         <div className="p-4 border-t border-white/10">
           <div className="h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="mt-4 w-full flex items-center gap-3 rounded-xl transition-all duration-200 px-4 py-3 text-zinc-400 hover:text-zinc-100 hover:bg-red-500/10"
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <span className="font-medium">Sign out</span>
+          </button>
         </div>
       </motion.aside>
 
@@ -87,6 +145,14 @@ export function Navigation() {
         {navItems.map((item) => (
           <NavLink key={item.href} item={item} isMobile />
         ))}
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="flex-1 flex flex-col justify-center items-center gap-1 py-2 px-3 rounded-xl transition-all duration-200 text-zinc-400 hover:text-zinc-100 hover:bg-red-500/10"
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          <span className="font-medium text-[10px]">Sign out</span>
+        </button>
       </nav>
     </>
   );

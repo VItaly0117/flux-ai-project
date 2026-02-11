@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Mail, Lock, Sparkles } from "lucide-react";
 
@@ -11,15 +12,24 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { login, loginWithGoogle } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      await login(email, password);
-      router.replace("/");
+      const res = await login(email, password);
+      if (res.ok) {
+        const next = searchParams.get("next") || "/";
+        router.replace(next);
+      } else {
+        console.error("Supabase login error:", res.error);
+        setError(res.error || "Invalid email or password.");
+      }
     } finally {
       setLoading(false);
     }
@@ -27,9 +37,13 @@ export default function LoginPage() {
 
   const handleGoogle = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await loginWithGoogle();
-      router.replace("/");
+      const res = await loginWithGoogle();
+      if (!res.ok) {
+        console.error("Supabase Google login error:", res.error);
+        setError(res.error || "Google sign-in failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -57,6 +71,12 @@ export default function LoginPage() {
           <h1 className="text-xl font-semibold text-zinc-100 text-center mb-2">Sign in</h1>
           <p className="text-zinc-500 text-sm text-center mb-6">Welcome back</p>
 
+          {error ? (
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              {error}
+            </div>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-zinc-400 mb-1.5">Email</label>
@@ -68,6 +88,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
+                  autoComplete="email"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/30 transition-all"
                 />
               </div>
@@ -83,6 +104,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
+                  autoComplete="current-password"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/30 transition-all"
                 />
               </div>
@@ -139,8 +161,11 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-zinc-500 mt-6">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-blue-400 hover:text-cyan-400 transition-colors">
-              Sign up
+            <Link
+              href="/signup"
+              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-100 hover:bg-white/10 hover:border-blue-500/30 transition-all"
+            >
+              Switch to Sign up
             </Link>
           </p>
         </div>

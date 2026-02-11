@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Mail, Lock, User, Sparkles } from "lucide-react";
 
@@ -12,15 +13,24 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { signup, loginWithGoogle } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      await signup(email, password, name || undefined);
-      router.replace("/");
+      const res = await signup(email, password, name || undefined);
+      if (res.ok) {
+        const next = searchParams.get("next") || "/";
+        router.replace(next);
+      } else {
+        console.error("Supabase signup error:", res.error);
+        setError(res.error || "Sign up failed. Please check your details and try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -28,9 +38,13 @@ export default function SignupPage() {
 
   const handleGoogle = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await loginWithGoogle();
-      router.replace("/");
+      const res = await loginWithGoogle();
+      if (!res.ok) {
+        console.error("Supabase Google signup error:", res.error);
+        setError(res.error || "Google sign-up failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -57,6 +71,12 @@ export default function SignupPage() {
           <h1 className="text-xl font-semibold text-zinc-100 text-center mb-2">Create account</h1>
           <p className="text-zinc-500 text-sm text-center mb-6">Get started with FLUX</p>
 
+          {error ? (
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              {error}
+            </div>
+          ) : null}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-zinc-400 mb-1.5">Name (optional)</label>
@@ -67,6 +87,7 @@ export default function SignupPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
+                  autoComplete="name"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/30 transition-all"
                 />
               </div>
@@ -82,6 +103,7 @@ export default function SignupPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
+                  autoComplete="email"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/30 transition-all"
                 />
               </div>
@@ -98,6 +120,7 @@ export default function SignupPage() {
                   placeholder="••••••••"
                   required
                   minLength={6}
+                  autoComplete="new-password"
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/30 transition-all"
                 />
               </div>
@@ -154,8 +177,11 @@ export default function SignupPage() {
 
           <p className="text-center text-sm text-zinc-500 mt-6">
             Already have an account?{" "}
-            <Link href="/login" className="text-blue-400 hover:text-cyan-400 transition-colors">
-              Sign in
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-100 hover:bg-white/10 hover:border-blue-500/30 transition-all"
+            >
+              Switch to Sign in
             </Link>
           </p>
         </div>

@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, ReactNode } from "react";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { createClient } from "@/utils/supabase/client";
 
 export type UserRole = "user" | "admin";
 
@@ -11,54 +13,122 @@ export interface User {
   role: UserRole;
 }
 
+type AuthResult = {
+  ok: boolean;
+  error: string | null;
+};
+
 interface AuthContextType {
   user: User | null;
   isLoggedIn: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  loginWithGoogle: () => Promise<boolean>;
-  signup: (email: string, password: string, name?: string) => Promise<boolean>;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  loginWithGoogle: () => Promise<AuthResult>;
+  signup: (email: string, password: string, name?: string) => Promise<AuthResult>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Mock admin user for testing: admin@flux.app / any password
-const MOCK_ADMIN = { id: "1", email: "admin@flux.app", role: "admin" as UserRole };
-const MOCK_USER = { id: "2", email: "user@flux.app", role: "user" as UserRole };
+type ProfileRow = {
+  id: string;
+  role: UserRole | null;
+  name: string | null;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const supabase = useMemo(() => createClient(), []);
+
+  const mapUser = useCallback(async (sbUser: SupabaseUser | null) => {
+    if (!sbUser) return null;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id, role, name")
+      .eq("id", sbUser.id)
+      .maybeSingle<ProfileRow>();
+
+    const role: UserRole = profile?.role === "admin" ? "admin" : "user";
+
+    return {
+      id: sbUser.id,
+      email: sbUser.email ?? "",
+      name: profile?.name ?? undefined,
+      role,
+    } satisfies User;
+  }, [supabase]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const init = async () => {
+      setIsLoading(true);
+      const { data } = await supabase.auth.getSession();
+      const sbUser = data.session?.user ?? null;
+      const mapped = await mapUser(sbUser);
+      if (mounted) {
+        setUser(mapped);
+        setIsLoading(false);
+      }
+    };
+
+    void init();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const mapped = await mapUser(session?.user ?? null);
+      if (mounted) {
+        setUser(mapped);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [mapUser, supabase]);
 
   const login = useCallback(async (email: string, password: string) => {
-    // Mock: admin@flux.app -> admin, anything else -> user
-    await new Promise((r) => setTimeout(r, 500));
-    if (email.toLowerCase() === "admin@flux.app") {
-      setUser(MOCK_ADMIN);
-    } else {
-      setUser({ ...MOCK_USER, email });
-    }
-    return true;
-  }, []);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return { ok: !error, error: error?.message ?? null };
+  }, [supabase]);
 
   const loginWithGoogle = useCallback(async () => {
-    await new Promise((r) => setTimeout(r, 500));
-    setUser(MOCK_USER);
-    return true;
-  }, []);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/` },
+    });
+    return { ok: !error, error: error?.message ?? null };
+  }, [supabase]);
 
   const signup = useCallback(async (email: string, password: string, name?: string) => {
-    await new Promise((r) => setTimeout(r, 500));
-    setUser({ id: crypto.randomUUID(), email, name, role: "user" });
-    return true;
-  }, []);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
-  const logout = useCallback(() => setUser(null), []);
+    if (error) return { ok: false, error: error.message };
+
+    const sbUser = data.user;
+    if (sbUser) {
+      await supabase.from("profiles").upsert({ id: sbUser.id, name: name ?? null });
+    }
+
+    return { ok: true, error: null };
+  }, [supabase]);
+
+  const logout = useCallback(() => {
+    void supabase.auth.signOut();
+  }, [supabase]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoggedIn: !!user,
+        isLoading,
         login,
         loginWithGoogle,
         signup,

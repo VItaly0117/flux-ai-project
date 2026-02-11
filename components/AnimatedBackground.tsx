@@ -2,15 +2,20 @@
 
 export function AnimatedBackground() {
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-      <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-blue-500/15 blur-3xl animate-blob-float" />
+    <div className="fixed inset-0 -z-10 pointer-events-none">
+      <div className="absolute inset-0 bg-[#020617]" />
       <div
-        className="absolute top-1/2 -left-40 w-80 h-80 rounded-full bg-indigo-500/10 blur-3xl animate-blob-float"
-        style={{ animationDelay: "-5s", animationDuration: "18s" }}
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(900px 600px at 20% 15%, rgba(59, 130, 246, 0.18), transparent 60%), radial-gradient(800px 520px at 85% 25%, rgba(99, 102, 241, 0.16), transparent 62%), radial-gradient(900px 700px at 55% 85%, rgba(34, 211, 238, 0.10), transparent 65%)",
+        }}
       />
       <div
-        className="absolute -bottom-40 right-1/3 w-72 h-72 rounded-full bg-cyan-500/10 blur-3xl animate-blob-float"
-        style={{ animationDelay: "-8s", animationDuration: "12s" }}
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(180deg, rgba(2, 6, 23, 0.4) 0%, rgba(2, 6, 23, 0.95) 70%, #020617 100%)",
+        }}
       />
     </div>
   );
