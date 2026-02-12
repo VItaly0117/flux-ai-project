@@ -1,6 +1,5 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { updateSession } from "@/utils/supabase/middleware";
+import { updateSession, copyCookies } from "@/utils/supabase/middleware";
 
 function applySecurityHeaders(response: NextResponse) {
   response.headers.set("X-Frame-Options", "DENY");
@@ -9,67 +8,39 @@ function applySecurityHeaders(response: NextResponse) {
   return response;
 }
 
-type CookieToSet = {
-  name: string;
-  value: string;
-  options?: Parameters<NextResponse["cookies"]["set"]>[2];
-};
+const PROTECTED_ROUTES = ["/admin", "/history", "/saved", "/profile", "/analyze"];
 
 export async function middleware(request: NextRequest) {
+  // Let the signout route pass through without session logic
   if (request.nextUrl.pathname.startsWith("/auth/signout")) {
     return applySecurityHeaders(NextResponse.next());
   }
 
-  let response = applySecurityHeaders(await updateSession(request));
+  // Single Supabase call — refreshes tokens and returns user + response with cookies
+  const { response, user } = await updateSession(request);
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  applySecurityHeaders(response);
 
-  if (!url || !anonKey) {
-    return applySecurityHeaders(response);
-  }
+  // Protect routes — redirect to /login if no session
+  const isProtected = PROTECTED_ROUTES.some((r) => request.nextUrl.pathname.startsWith(r));
 
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet: CookieToSet[]) {
-        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = applySecurityHeaders(NextResponse.next({ request: { headers: request.headers } }));
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user) {
-    console.log("Middleware: Session found", { path: request.nextUrl.pathname, userId: user.id });
-  } else {
-    console.log("Middleware: No session", { path: request.nextUrl.pathname });
-  }
-
-  if (
-    !user &&
-    (request.nextUrl.pathname.startsWith("/admin") ||
-      request.nextUrl.pathname.startsWith("/history") ||
-      request.nextUrl.pathname.startsWith("/saved") ||
-      request.nextUrl.pathname.startsWith("/profile") ||
-      request.nextUrl.pathname.startsWith("/analyze"))
-  ) {
+  if (!user && isProtected) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", request.nextUrl.pathname);
-    return applySecurityHeaders(NextResponse.redirect(loginUrl));
+    const redirect = NextResponse.redirect(loginUrl);
+    // CRITICAL: copy refreshed cookies to the redirect response
+    copyCookies(response, redirect);
+    return applySecurityHeaders(redirect);
   }
 
+  // Already logged in — bounce away from auth pages
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup")) {
-    return applySecurityHeaders(NextResponse.redirect(new URL("/", request.url)));
+    const redirect = NextResponse.redirect(new URL("/", request.url));
+    copyCookies(response, redirect);
+    return applySecurityHeaders(redirect);
   }
 
-  return applySecurityHeaders(response);
+  return response;
 }
 
 export const config = {

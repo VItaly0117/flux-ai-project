@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Home, History, Upload, User, Shield, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { createClient } from "@/utils/supabase/client";
 
 const baseNavItems = [
   { icon: Home, label: "Home", href: "/" },
@@ -50,56 +49,12 @@ function NavLink({ item, isMobile = false }: { item: (typeof baseNavItems)[0]; i
 export function Navigation() {
   const router = useRouter();
   const { user } = useAuth();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const adminItem = { icon: Shield, label: "Admin", href: "/admin/dashboard" as const };
   const pathname = usePathname();
 
-  const supabase = useMemo(() => createClient(), []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadRole() {
-      try {
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError) throw userError;
-
-        const sbUser = userData.user;
-        if (!sbUser) {
-          if (!cancelled) setIsAdmin(false);
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", sbUser.id)
-          .maybeSingle<{ role: string | null }>();
-
-        const role = (profile?.role ?? "user").toString().toLowerCase();
-        if (!cancelled) setIsAdmin(role === "admin");
-      } catch {
-        if (!cancelled) setIsAdmin(false);
-      }
-    }
-
-    void loadRole();
-
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
-        void loadRole();
-      }
-      if (event === "SIGNED_OUT") {
-        if (!cancelled) setIsAdmin(false);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      sub.subscription.unsubscribe();
-    };
-  }, [supabase, user?.id]);
+  // Derive admin state directly from AuthContext — always fresh, no stale cache
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
