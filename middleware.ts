@@ -8,7 +8,7 @@ function applySecurityHeaders(response: NextResponse) {
   return response;
 }
 
-const PROTECTED_ROUTES = ["/admin", "/history", "/saved", "/profile", "/analyze"];
+const PROTECTED_ROUTES = ["/admin", "/dashboard", "/history", "/saved", "/profile", "/analyze"];
 
 export async function middleware(request: NextRequest) {
   // Let the signout route pass through without session logic
@@ -35,7 +35,7 @@ export async function middleware(request: NextRequest) {
 
   // Already logged in — bounce away from auth pages
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup")) {
-    const redirect = NextResponse.redirect(new URL("/", request.url));
+    const redirect = NextResponse.redirect(new URL("/dashboard", request.url));
     copyCookies(response, redirect);
     return applySecurityHeaders(redirect);
   }

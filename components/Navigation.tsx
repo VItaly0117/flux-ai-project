@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Home, History, Upload, User, Shield, LogOut, Menu, X } from "lucide-react";
+import { Home, LayoutDashboard, History, Upload, User, Shield, LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 const baseNavItems = [
   { icon: Home, label: "Home", href: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: History, label: "Reports", href: "/history" },
-  { icon: Upload, label: "Upload", href: "/upload" },
   { icon: User, label: "Profile", href: "/settings" },
 ];
 

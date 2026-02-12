@@ -2,7 +2,36 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 
-const SYSTEM_INSTRUCTION = `You are a relationship expert analyzing a chat export between two people. Detect dynamics, initiative, and mood.
+function buildSystemInstruction(opts: {
+  my_gender: string;
+  partner_gender: string;
+  deep_psychology: boolean;
+  detect_sarcasm: boolean;
+  dating_advice: boolean;
+}): string {
+  const genderCtx = `The user is ${opts.my_gender} and the partner is ${opts.partner_gender}.`;
+
+  const extras: string[] = [];
+  if (opts.deep_psychology) {
+    extras.push(
+      "Provide deep psychological analysis: attachment style indicators, manipulation red flags, emotional dependency patterns, and subconscious communication cues."
+    );
+  }
+  if (opts.detect_sarcasm) {
+    extras.push(
+      "Pay special attention to sarcasm, passive-aggression, and hidden meanings behind seemingly neutral messages."
+    );
+  }
+  if (opts.dating_advice) {
+    extras.push(
+      "Include practical dating advice tailored to the user's situation — what to text next, when to text, and strategic tips."
+    );
+  }
+
+  return `You are a relationship expert and communication analyst. ${genderCtx}
+
+Analyze the chat export between these two people. Detect dynamics, initiative balance, emotional tone, and hidden signals.
+${extras.length > 0 ? "\nAdditional instructions:\n" + extras.map((e) => "- " + e).join("\n") : ""}
 
 Return ONLY raw JSON (no markdown, no code fences, no explanation) with exactly these fields:
 {
@@ -13,6 +42,7 @@ Return ONLY raw JSON (no markdown, no code fences, no explanation) with exactly 
   "advice": [<array of exactly 3 short, actionable strings>],
   "summary": "<short 1-sentence summary>"
 }`;
+}
 
 function clamp(n: unknown, fallback = 50): number {
   const v = Number(n);
@@ -40,14 +70,29 @@ export async function POST(request: Request) {
       );
     }
 
+    // Extract options with defaults
+    const my_gender = body.my_gender || "unknown";
+    const partner_gender = body.partner_gender || "unknown";
+    const deep_psychology = !!body.deep_psychology;
+    const detect_sarcasm = !!body.detect_sarcasm;
+    const dating_advice = body.dating_advice !== false;
+
     // Truncate very long inputs to ~30k chars to stay within token limits
     const truncated = text.slice(0, 30_000);
 
     // --- Gemini AI ---
+    const systemInstruction = buildSystemInstruction({
+      my_gender,
+      partner_gender,
+      deep_psychology,
+      detect_sarcasm,
+      dating_advice,
+    });
+
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction,
     });
 
     const result = await model.generateContent(
@@ -81,7 +126,7 @@ export async function POST(request: Request) {
       ? analysis.sentiment_history.slice(0, 10).map((n: unknown) => clamp(n))
       : [50, 50, 50, 50, 50, 50, 50, 50, 50, 50];
     const advice = Array.isArray(analysis.advice)
-      ? analysis.advice.slice(0, 3).map(String)
+      ? analysis.advice.slice(0, 5).map(String)
       : ["No specific advice generated."];
     const summary = typeof analysis.summary === "string" ? analysis.summary : "Analysis Complete";
 
