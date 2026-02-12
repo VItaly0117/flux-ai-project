@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Brain, FileUp, LineChart, MessageSquareText, Scale, Sparkles, Upload, X } from "lucide-react";
+import { ArrowRight, Brain, FileUp, Loader2, LineChart, MessageSquareText, Scale, Sparkles, Upload, X } from "lucide-react";
 import { useToast } from "@/components/ToastProvider";
 
 const fadeUp = {
@@ -13,12 +13,21 @@ const fadeUp = {
 
 type InputMode = "upload" | "paste";
 
+interface AnalysisData {
+  interestScore: number;
+  initiativeBalance: { user: number; partner: number };
+  sentimentHistory: number[];
+  advice: string[];
+  summary: string;
+}
+
 export default function HomePage() {
   const [inputMode, setInputMode] = useState<InputMode>("upload");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
-  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisData, setAnalysisData] = useState<AnalysisData | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
@@ -56,7 +65,7 @@ export default function HomePage() {
 
   const hasInput = inputMode === "upload" ? !!uploadedFile : pastedText.trim().length > 0;
 
-  const runMockAnalysis = async () => {
+  const runAnalysis = async () => {
     if (!hasInput) {
       toast.error(
         inputMode === "upload"
@@ -66,31 +75,51 @@ export default function HomePage() {
       return;
     }
 
+    setIsAnalyzing(true);
+
     try {
+      let chatText = "";
+
       if (inputMode === "upload" && uploadedFile) {
-        if (uploadedFile.name.endsWith(".json")) {
-          const text = await uploadedFile.text();
-          JSON.parse(text);
-        }
+        chatText = await uploadedFile.text();
+      } else {
+        chatText = pastedText;
       }
 
-      setHasAnalyzed(true);
-      toast.success("Analysis complete");
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: chatText }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Analysis failed");
+        return;
+      }
+
+      setAnalysisData(data as AnalysisData);
+      toast.success("Analysis complete — powered by Gemini AI");
     } catch {
-      toast.error("Error parsing file");
+      toast.error("Network error. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
   const reset = () => {
-    setHasAnalyzed(false);
+    setAnalysisData(null);
     setUploadedFile(null);
     setPastedText("");
   };
 
-  const interestScore = 78;
-  const youFirst = 62;
-  const partnerFirst = 38;
-  const tonePoints = [18, 24, 14, 32, 28, 42, 34, 48, 40, 56];
+  const interestScore = analysisData?.interestScore ?? 0;
+  const youFirst = analysisData?.initiativeBalance.user ?? 50;
+  const partnerFirst = analysisData?.initiativeBalance.partner ?? 50;
+  const tonePoints = analysisData?.sentimentHistory ?? [];
+  const advice = analysisData?.advice ?? [];
+  const summary = analysisData?.summary ?? "";
 
   return (
     <div className="relative">
@@ -239,13 +268,22 @@ export default function HomePage() {
               <div className="mt-4 flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  onClick={runMockAnalysis}
-                  disabled={!hasInput}
+                  onClick={runAnalysis}
+                  disabled={!hasInput || isAnalyzing}
                   className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-500 text-white shadow-lg shadow-blue-500/25 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                   style={{ animation: "gradient-shift 3s ease infinite" }}
                 >
-                  Analyze
-                  <ArrowRight className="h-5 w-5" />
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Analyzing with AI...
+                    </>
+                  ) : (
+                    <>
+                      Analyze
+                      <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
                 </button>
                 <Link
                   href="/history"
@@ -257,7 +295,7 @@ export default function HomePage() {
             </div>
           </motion.div>
 
-          {hasAnalyzed ? (
+          {analysisData ? (
             <motion.div
               variants={fadeUp}
               initial="hidden"
@@ -268,8 +306,17 @@ export default function HomePage() {
               <div className="rounded-2xl backdrop-blur-2xl bg-blue-500/5 border border-white/10 shadow-xl shadow-blue-500/20 p-6 sm:p-8">
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-bold text-zinc-100">Analysis Dashboard</h2>
-                    <p className="mt-1 text-sm text-zinc-500">Mock results — real analysis will be plugged in later.</p>
+                    <div>
+                      <h2 className="text-2xl font-bold text-zinc-100">Analysis Dashboard</h2>
+                      <p className="mt-1 text-sm text-zinc-500">Powered by Gemini AI</p>
+                    </div>
+                    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                      summary.toLowerCase().includes("high") || summary.toLowerCase().includes("mutual")
+                        ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                        : summary.toLowerCase().includes("cold") || summary.toLowerCase().includes("toxic")
+                          ? "bg-red-500/15 text-red-300 border border-red-500/30"
+                          : "bg-blue-500/15 text-blue-300 border border-blue-500/30"
+                    }`}>{summary}</span>
                   </div>
                   <button
                     type="button"
@@ -310,7 +357,11 @@ export default function HomePage() {
                         </div>
                       </div>
                       <div className="text-sm text-zinc-400 leading-relaxed">
-                        High interest indicators: fast replies, steady initiative, and warm tone.
+                        {interestScore >= 70
+                          ? "High interest indicators: fast replies, steady initiative, and warm tone."
+                          : interestScore >= 40
+                            ? "Moderate interest detected. Some engagement but room for improvement."
+                            : "Low interest signals. Consider changing your approach."}
                       </div>
                     </div>
                   </motion.div>
@@ -365,7 +416,7 @@ export default function HomePage() {
                           <span className="text-zinc-300">Partner</span>
                           <span className="text-cyan-200">{partnerFirst}%</span>
                         </div>
-                        <div className="mt-3 text-xs text-zinc-500">(Mock pie representation)</div>
+                        <div className="mt-3 text-xs text-zinc-500">(Based on conversation initiative)</div>
                       </div>
                     </div>
                   </motion.div>
@@ -386,22 +437,24 @@ export default function HomePage() {
                               <stop offset="100%" stopColor="rgba(34,211,238,0.9)" />
                             </linearGradient>
                           </defs>
-                          <path
-                            d={`M 20 ${140 - tonePoints[0]} ${tonePoints
-                              .map((v, i) => `L ${20 + i * 60} ${140 - v}`)
-                              .join(" ")}`}
-                            fill="none"
-                            stroke="url(#tone)"
-                            strokeWidth="4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                          {tonePoints.map((v, i) => (
-                            <circle key={i} cx={20 + i * 60} cy={140 - v} r="5" fill="rgba(34,211,238,0.85)" />
-                          ))}
+                          {tonePoints.length > 0 && (
+                            <>
+                              <path
+                                d={`M ${tonePoints.map((v, i) => `${20 + i * (560 / Math.max(tonePoints.length - 1, 1))} ${140 - v * 1.2}`).join(" L ")}`}
+                                fill="none"
+                                stroke="url(#tone)"
+                                strokeWidth="4"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              {tonePoints.map((v, i) => (
+                                <circle key={i} cx={20 + i * (560 / Math.max(tonePoints.length - 1, 1))} cy={140 - v * 1.2} r="5" fill="rgba(34,211,238,0.85)" />
+                              ))}
+                            </>
+                          )}
                         </svg>
                         <div className="mt-2 text-xs text-zinc-500">
-                          Higher = warmer tone. Lower = colder tone. (Mock sentiment)
+                          Higher = warmer tone. Lower = colder tone.
                         </div>
                       </div>
                     </div>
@@ -416,10 +469,9 @@ export default function HomePage() {
                     <div className="text-sm font-semibold text-zinc-100">AI Advice</div>
                     <div className="mt-4 rounded-2xl bg-black/20 border border-white/10 p-4">
                       <ul className="list-disc pl-5 space-y-2 text-sm text-zinc-300">
-                        <li>You are asking too many questions in a row — add statements and playful hooks.</li>
-                        <li>Partner responds with shorter answers when the topic becomes logistical.</li>
-                        <li>Try matching their response length for 3–5 messages and see if engagement improves.</li>
-                        <li>When they use emojis, your best-performing replies mirror tone + timing.</li>
+                        {advice.map((tip, i) => (
+                          <li key={i}>{tip}</li>
+                        ))}
                       </ul>
                     </div>
                   </motion.div>
