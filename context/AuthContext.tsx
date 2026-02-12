@@ -44,8 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const hasRecovered = useRef(false);
 
+  const ADMIN_EMAILS = ["admin@flux.com", "boss@flux.com"];
+
   const mapUser = useCallback(async (sbUser: SupabaseUser | null): Promise<User | null> => {
     if (!sbUser) return null;
+
+    const isHardcodedAdmin = !!sbUser.email && ADMIN_EMAILS.includes(sbUser.email);
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -53,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("id", sbUser.id)
       .maybeSingle<ProfileRow>();
 
-    const role: UserRole = profile?.role === "admin" ? "admin" : "user";
+    const role: UserRole = isHardcodedAdmin ? "admin" : (profile?.role === "admin" ? "admin" : "user");
 
     return {
       id: sbUser.id,
