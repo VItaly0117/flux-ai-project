@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Brain, LineChart, Scale, Sparkles, Upload, X } from "lucide-react";
+import { ArrowRight, Brain, FileUp, LineChart, MessageSquareText, Scale, Sparkles, Upload, X } from "lucide-react";
 import { useToast } from "@/components/ToastProvider";
 
 const fadeUp = {
@@ -11,10 +11,15 @@ const fadeUp = {
   visible: { opacity: 1, y: 0 },
 };
 
+type InputMode = "upload" | "paste";
+
 export default function HomePage() {
+  const [inputMode, setInputMode] = useState<InputMode>("upload");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [pastedText, setPastedText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -29,6 +34,17 @@ export default function HomePage() {
     }
   }, [toast]);
 
+  const onFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && (file.name.endsWith(".json") || file.name.endsWith(".txt"))) {
+      setUploadedFile(file);
+      toast.success("File uploaded");
+    } else if (file) {
+      toast.error("Unsupported file. Please upload .txt or .json");
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [toast]);
+
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -38,16 +54,24 @@ export default function HomePage() {
 
   const removeFile = () => setUploadedFile(null);
 
+  const hasInput = inputMode === "upload" ? !!uploadedFile : pastedText.trim().length > 0;
+
   const runMockAnalysis = async () => {
-    if (!uploadedFile) {
-      toast.error("Please upload a .txt or .json file first");
+    if (!hasInput) {
+      toast.error(
+        inputMode === "upload"
+          ? "Please upload a .txt or .json file first"
+          : "Please paste your conversation text first"
+      );
       return;
     }
 
     try {
-      if (uploadedFile.name.endsWith(".json")) {
-        const text = await uploadedFile.text();
-        JSON.parse(text);
+      if (inputMode === "upload" && uploadedFile) {
+        if (uploadedFile.name.endsWith(".json")) {
+          const text = await uploadedFile.text();
+          JSON.parse(text);
+        }
       }
 
       setHasAnalyzed(true);
@@ -60,6 +84,7 @@ export default function HomePage() {
   const reset = () => {
     setHasAnalyzed(false);
     setUploadedFile(null);
+    setPastedText("");
   };
 
   const interestScore = 78;
@@ -97,57 +122,126 @@ export default function HomePage() {
             </p>
 
             <div className="mt-10">
-              <div className="text-sm font-medium text-zinc-400 mb-2">Upload chat history</div>
-              <div
-                onDrop={onDrop}
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
-                className={
-                  "rounded-2xl backdrop-blur-2xl border border-dashed transition-all duration-300 overflow-hidden " +
-                  (uploadedFile
-                    ? "bg-blue-500/10 border-blue-500/40 shadow-lg shadow-blue-500/10"
-                    : isDragging
-                      ? "bg-blue-500/10 border-blue-500/50 shadow-lg shadow-blue-500/20"
-                      : "bg-blue-500/5 border-white/10 hover:border-blue-500/30 hover:bg-blue-500/5")
-                }
-              >
-                {uploadedFile ? (
-                  <div className="p-6 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-12 w-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
-                        <Upload className="w-6 h-6 text-cyan-300" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-medium text-zinc-100 truncate">{uploadedFile.name}</div>
-                        <div className="text-sm text-zinc-500">{(uploadedFile.size / 1024).toFixed(1)} KB</div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={removeFile}
-                      className="p-2 rounded-xl text-zinc-300 hover:text-zinc-100 hover:bg-white/10 transition-colors"
-                      aria-label="Remove file"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-8 sm:p-10 text-center">
-                    <Upload className="w-12 h-12 mx-auto text-blue-400/70 mb-3" />
-                    <div className="text-zinc-200 font-semibold">Drop your chat export here (.txt, .json)</div>
-                    <div className="mt-1 text-sm text-zinc-500">
-                      Drag & drop from Telegram/WhatsApp exports for instant analysis.
-                    </div>
-                  </div>
-                )}
+              {/* Tab switcher */}
+              <div className="flex rounded-xl bg-white/5 border border-white/10 p-1 mb-4 w-fit">
+                <button
+                  type="button"
+                  onClick={() => setInputMode("upload")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    inputMode === "upload"
+                      ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <FileUp className="w-4 h-4" />
+                  Upload File
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInputMode("paste")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    inputMode === "paste"
+                      ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  <MessageSquareText className="w-4 h-4" />
+                  Paste Text
+                </button>
               </div>
+
+              {/* Upload File mode */}
+              {inputMode === "upload" && (
+                <>
+                  <div
+                    onDrop={onDrop}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onClick={() => !uploadedFile && fileInputRef.current?.click()}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+                    className={
+                      "rounded-2xl backdrop-blur-2xl border border-dashed transition-all duration-300 overflow-hidden cursor-pointer " +
+                      (uploadedFile
+                        ? "bg-blue-500/10 border-blue-500/40 shadow-lg shadow-blue-500/10"
+                        : isDragging
+                          ? "bg-blue-500/10 border-blue-500/50 shadow-lg shadow-blue-500/20"
+                          : "bg-blue-500/5 border-white/10 hover:border-blue-500/30 hover:bg-blue-500/5")
+                    }
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".txt,.json"
+                      onChange={onFileSelect}
+                      className="hidden"
+                    />
+                    {uploadedFile ? (
+                      <div className="p-6 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-12 w-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                            <Upload className="w-6 h-6 text-cyan-300" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-zinc-100 truncate">{uploadedFile.name}</div>
+                            <div className="text-sm text-zinc-500">{(uploadedFile.size / 1024).toFixed(1)} KB</div>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); removeFile(); }}
+                          className="p-2 rounded-xl text-zinc-300 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+                          aria-label="Remove file"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-8 sm:p-10 text-center">
+                        <Upload className="w-12 h-12 mx-auto text-blue-400/70 mb-3" />
+                        <div className="text-zinc-200 font-semibold">Drop your chat export here or click to browse</div>
+                        <div className="mt-1 text-sm text-zinc-500">
+                          Supports .txt and .json from Telegram / WhatsApp exports.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Paste Text mode */}
+              {inputMode === "paste" && (
+                <div className="rounded-2xl backdrop-blur-2xl bg-blue-500/5 border border-white/10 overflow-hidden">
+                  <textarea
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    placeholder={"Paste your conversation here...\n\nExample:\n[10:30] Alice: Hey, how are you?\n[10:31] Bob: I'm great! Just got back from a run."}
+                    rows={8}
+                    className="w-full bg-transparent text-zinc-100 placeholder-zinc-600 p-6 text-sm leading-relaxed focus:outline-none resize-y min-h-[160px] max-h-[400px]"
+                  />
+                  {pastedText.length > 0 && (
+                    <div className="px-6 pb-4 flex items-center justify-between">
+                      <span className="text-xs text-zinc-500">{pastedText.length} characters</span>
+                      <button
+                        type="button"
+                        onClick={() => setPastedText("")}
+                        className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="mt-4 flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
                   onClick={runMockAnalysis}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-500 text-white shadow-lg shadow-blue-500/25 border border-white/10"
+                  disabled={!hasInput}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-500 text-white shadow-lg shadow-blue-500/25 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                   style={{ animation: "gradient-shift 3s ease infinite" }}
                 >
                   Analyze

@@ -31,7 +31,7 @@ export default function HistoryPage() {
             style={{ animation: "gradient-shift 3s ease infinite" }}
           >
             <Sparkles className="w-5 h-5" />
-            Generate
+            New Analysis
           </Link>
         </div>
 
@@ -40,8 +40,8 @@ export default function HistoryPage() {
             <div className="mx-auto w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
               <FileText className="w-7 h-7 text-zinc-300" />
             </div>
-            <h2 className="mt-4 text-lg font-semibold text-zinc-100">No history yet</h2>
-            <p className="mt-1 text-sm text-zinc-500">Create your first generation to see it here.</p>
+            <h2 className="mt-4 text-lg font-semibold text-zinc-100">No reports yet</h2>
+            <p className="mt-1 text-sm text-zinc-500">Analyze your first conversation to see it here.</p>
             <Link
               href="/upload"
               className="mt-6 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-zinc-100 hover:bg-white/10 transition-all"

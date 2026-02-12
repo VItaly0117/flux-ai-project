@@ -76,8 +76,8 @@ function LoginForm() {
             </span>
           </Link>
 
-          <h1 className="text-xl font-semibold text-zinc-100 text-center mb-2">Sign in</h1>
-          <p className="text-zinc-500 text-sm text-center mb-6">Welcome back</p>
+          <h1 className="text-xl font-semibold text-zinc-100 text-center mb-2">Welcome Back</h1>
+          <p className="text-zinc-500 text-sm text-center mb-6">Log in to your Flux account</p>
 
           {error ? (
             <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -125,7 +125,7 @@ function LoginForm() {
               whileTap={{ scale: 0.99 }}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-500 text-white font-semibold shadow-lg shadow-blue-500/25 disabled:opacity-70 transition-all"
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? "Logging in..." : "Log In"}
             </motion.button>
           </form>
 
@@ -164,16 +164,16 @@ function LoginForm() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Sign in with Google
+            Log in with Google
           </motion.button>
 
           <p className="text-center text-sm text-zinc-500 mt-6">
-            Don&apos;t have an account?{" "}
+            Need an account?{" "}
             <Link
               href="/signup"
               className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-100 hover:bg-white/10 hover:border-blue-500/30 transition-all"
             >
-              Switch to Sign up
+              Sign Up
             </Link>
           </p>
         </div>

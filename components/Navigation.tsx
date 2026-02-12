@@ -9,8 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 
 const baseNavItems = [
   { icon: Home, label: "Home", href: "/" },
-  { icon: History, label: "History", href: "/history" },
-  { icon: Upload, label: "Upload Context", href: "/upload" },
+  { icon: History, label: "Reports", href: "/history" },
+  { icon: Upload, label: "Upload", href: "/upload" },
   { icon: User, label: "Profile", href: "/settings" },
 ];
 
@@ -25,6 +25,41 @@ function useIsDesktop() {
     return () => window.removeEventListener("resize", check);
   }, []);
   return isDesktop;
+}
+
+function UserProfileCard({ user, compact = false }: { user: { email: string; name?: string; role: string }; compact?: boolean }) {
+  const displayName = user.name || user.email.split("@")[0];
+  const initial = (displayName[0] || "U").toUpperCase();
+  const isAdmin = user.role === "admin";
+
+  return (
+    <div className={`flex items-center gap-3 ${compact ? "px-4 py-3" : "px-4 py-3"}`}>
+      <div
+        className={`flex-shrink-0 flex items-center justify-center rounded-full font-bold text-white ${
+          isAdmin
+            ? "bg-gradient-to-br from-purple-500 to-amber-400 shadow-lg shadow-purple-500/25"
+            : "bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-blue-500/25"
+        } ${compact ? "w-9 h-9 text-sm" : "w-10 h-10 text-sm"}`}
+      >
+        {initial}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-zinc-100 truncate">{displayName}</div>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-xs text-zinc-500 truncate">{user.email}</span>
+        </div>
+      </div>
+      <span
+        className={`flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+          isAdmin
+            ? "bg-purple-500/20 text-amber-300 border border-purple-500/30"
+            : "bg-blue-500/10 text-blue-300 border border-blue-500/20"
+        }`}
+      >
+        {isAdmin ? "Admin" : "User"}
+      </span>
+    </div>
+  );
 }
 
 function NavLink({ item, isMobile = false }: { item: (typeof baseNavItems)[0]; isMobile?: boolean }) {
@@ -98,12 +133,13 @@ export function Navigation() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-white/10 space-y-2">
+          {user && <UserProfileCard user={user} />}
           <div className="h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
           <button
             type="button"
             onClick={handleSignOut}
-            className="mt-4 w-full flex items-center gap-3 rounded-xl transition-all duration-200 px-4 py-3 text-zinc-400 hover:text-zinc-100 hover:bg-red-500/10"
+            className="w-full flex items-center gap-3 rounded-xl transition-all duration-200 px-4 py-3 text-zinc-400 hover:text-zinc-100 hover:bg-red-500/10"
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
             <span className="font-medium">Sign out</span>
@@ -184,12 +220,13 @@ export function Navigation() {
                 })}
               </div>
 
-              <div className="absolute left-0 right-0 bottom-0 px-5">
+              <div className="absolute left-0 right-0 bottom-0 px-5 space-y-2">
+                {user && <UserProfileCard user={user} compact />}
                 <div className="h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="mt-4 w-full flex items-center gap-3 rounded-2xl px-4 py-4 text-base font-medium text-zinc-200 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
+                  className="w-full flex items-center gap-3 rounded-2xl px-4 py-4 text-base font-medium text-zinc-200 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all"
                 >
                   <LogOut className="w-5 h-5" />
                   <span>Sign out</span>

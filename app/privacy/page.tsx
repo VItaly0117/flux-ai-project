@@ -16,8 +16,8 @@ export default function PrivacyPage() {
               The service is provided on an “as is” basis. We may update or discontinue features at any time.
             </p>
             <p className="text-zinc-300">
-              You are responsible for any content you submit, including prompts and generated outputs. Do not use the
-              service for unlawful, harmful, or abusive activities.
+              You are responsible for any content you submit, including uploaded chat logs and analysis results. Do not
+              use the service for unlawful, harmful, or abusive activities.
             </p>
           </section>
 
@@ -38,7 +38,7 @@ export default function PrivacyPage() {
               (such as a display name) in our database.
             </p>
             <p className="text-zinc-300">
-              Generated images and history are intended to be private to your account. Access to protected pages requires
+              Analysis reports and history are intended to be private to your account. Access to protected pages requires
               an authenticated session.
             </p>
           </section>

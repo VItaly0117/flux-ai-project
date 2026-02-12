@@ -13,11 +13,11 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "FLUX - AI Image Generator",
-  description: "Create stunning visuals with the power of Flux AI.",
+  title: "FLUX - AI Chat Analyzer",
+  description: "Decode your conversations with the power of Flux AI.",
   openGraph: {
-    title: "FLUX - AI Image Generator",
-    description: "Create stunning visuals with the power of Flux AI.",
+    title: "FLUX - AI Chat Analyzer",
+    description: "Decode your conversations with the power of Flux AI.",
     type: "website",
   },
 };
