@@ -14,9 +14,10 @@ const fadeUp = {
 type InputMode = "upload" | "paste";
 
 interface AnalysisData {
-  interestScore: number;
-  initiativeBalance: { user: number; partner: number };
-  sentimentHistory: number[];
+  interest_score: number;
+  initiative_user: number;
+  initiative_partner: number;
+  sentiment_history: number[];
   advice: string[];
   summary: string;
 }
@@ -114,10 +115,10 @@ export default function HomePage() {
     setPastedText("");
   };
 
-  const interestScore = analysisData?.interestScore ?? 0;
-  const youFirst = analysisData?.initiativeBalance.user ?? 50;
-  const partnerFirst = analysisData?.initiativeBalance.partner ?? 50;
-  const tonePoints = analysisData?.sentimentHistory ?? [];
+  const interestScore = analysisData?.interest_score ?? 0;
+  const youFirst = analysisData?.initiative_user ?? 50;
+  const partnerFirst = analysisData?.initiative_partner ?? 50;
+  const tonePoints = analysisData?.sentiment_history ?? [];
   const advice = analysisData?.advice ?? [];
   const summary = analysisData?.summary ?? "";
 
