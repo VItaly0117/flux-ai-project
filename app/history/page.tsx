@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { FileText, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 interface ReportRow {
   id: string;
@@ -15,6 +16,7 @@ interface ReportRow {
 }
 
 export default function HistoryPage() {
+  const { isLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +32,21 @@ export default function HistoryPage() {
     };
     void load();
   }, [supabase]);
+
+  if (isLoading) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+            className="w-8 h-8 border-2 border-white/20 border-t-cyan-400 rounded-full inline-block"
+          />
+          <p className="mt-4 text-zinc-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8 sm:py-12">

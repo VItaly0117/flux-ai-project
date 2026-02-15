@@ -24,10 +24,25 @@ const PRO_FEATURES = [
 ];
 
 export default function PricingPage() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const toast = useToast();
   const [upgrading, setUpgrading] = useState(false);
+
+  if (isLoading) {
+    return (
+      <div className="px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+            className="w-8 h-8 border-2 border-white/20 border-t-cyan-400 rounded-full inline-block"
+          />
+          <p className="mt-4 text-zinc-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleUpgrade = async () => {
     if (!user) {
