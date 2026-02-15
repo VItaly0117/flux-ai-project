@@ -31,6 +31,15 @@ export default function PrivacyPage() {
             </p>
           </section>
 
+          <section className="space-y-3 rounded-xl bg-blue-500/10 border border-blue-500/20 p-5">
+            <h3 className="text-base font-semibold text-cyan-300">How Your Chat Data Is Handled</h3>
+            <p className="text-zinc-300">
+              Your chat data is processed in real-time by Google Gemini and stored in your private database (Supabase)
+              with Row Level Security (RLS). No other users can see your data. Only you have access to your reports
+              and analysis history. Chat logs are never shared with third parties or used for model training.
+            </p>
+          </section>
+
           <section className="space-y-3">
             <h3 className="text-base font-semibold text-zinc-100">What we collect</h3>
             <p className="text-zinc-300">

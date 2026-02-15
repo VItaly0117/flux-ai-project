@@ -7,11 +7,16 @@ import { useRouter } from "next/navigation";
 
 export type UserRole = "user" | "admin";
 
+export type Gender = "male" | "female" | "other";
+
 export interface User {
   id: string;
   email: string;
   name?: string;
   role: UserRole;
+  gender?: Gender;
+  bio?: string;
+  is_pro: boolean;
 }
 
 type AuthResult = {
@@ -35,6 +40,9 @@ type ProfileRow = {
   id: string;
   role: UserRole | null;
   name: string | null;
+  gender: Gender | null;
+  bio: string | null;
+  is_pro: boolean | null;
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -53,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id, role, name")
+      .select("id, role, name, gender, bio, is_pro")
       .eq("id", sbUser.id)
       .maybeSingle<ProfileRow>();
 
@@ -64,6 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: sbUser.email ?? "",
       name: profile?.name ?? undefined,
       role,
+      gender: (profile?.gender as Gender) ?? undefined,
+      bio: profile?.bio ?? undefined,
+      is_pro: !!profile?.is_pro,
     } satisfies User;
   }, [supabase]);
 
@@ -163,7 +174,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/` },
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+        queryParams: { access_type: "offline", prompt: "consent" },
+      },
     });
     return { ok: !error, error: error?.message ?? null };
   }, [supabase]);

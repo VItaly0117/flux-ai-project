@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 
 export async function updateProfile(formData: FormData) {
   const fullName = (formData.get("fullName")?.toString() ?? "").trim();
+  const gender = (formData.get("gender")?.toString() ?? "").trim() || null;
+  const bio = (formData.get("bio")?.toString() ?? "").trim() || null;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
@@ -15,7 +17,10 @@ export async function updateProfile(formData: FormData) {
 
   const { error: upsertError } = await supabase
     .from("profiles")
-    .upsert({ id: user.id, name: fullName || null }, { onConflict: "id" });
+    .upsert(
+      { id: user.id, name: fullName || null, gender, bio },
+      { onConflict: "id" }
+    );
 
   if (upsertError) throw upsertError;
 

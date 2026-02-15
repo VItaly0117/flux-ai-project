@@ -1,23 +1,27 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowRight,
+  Crown,
   FileUp,
   Loader2,
+  Lock,
+  MessageCircle,
   MessageSquareText,
   Send,
   Upload,
   X,
 } from "lucide-react";
 import { useToast } from "@/components/ToastProvider";
+import { useAuth } from "@/context/AuthContext";
+import type { Gender } from "@/context/AuthContext";
 
 /* ───────── types ───────── */
 
-type InputMode = "upload" | "paste";
-type Gender = "male" | "female" | "other";
+type InputTab = "upload" | "paste" | "coach";
 type DashPhase = "input" | "analyzing" | "results";
 
 interface AnalysisData {
@@ -48,10 +52,12 @@ function Toggle({
   enabled,
   onToggle,
   label,
+  locked,
 }: {
   enabled: boolean;
   onToggle: () => void;
   label: string;
+  locked?: boolean;
 }) {
   return (
     <button
@@ -59,7 +65,11 @@ function Toggle({
       onClick={onToggle}
       className="flex items-center justify-between gap-4 w-full"
     >
-      <span className="text-sm text-zinc-300">{label}</span>
+      <span className="text-sm text-zinc-300 flex items-center gap-2">
+        {label}
+        {locked && <Lock className="w-3.5 h-3.5 text-amber-400" />}
+        {locked && <span className="text-[10px] text-amber-400 font-semibold">PRO</span>}
+      </span>
       <div
         className={`relative w-11 h-6 rounded-full transition-colors ${
           enabled ? "bg-cyan-500" : "bg-white/10"
@@ -117,20 +127,27 @@ function GenderSelector({
 /* ───────── Main Dashboard ───────── */
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const isPro = user?.is_pro ?? false;
+
   /* input state */
-  const [inputMode, setInputMode] = useState<InputMode>("upload");
+  const [inputTab, setInputTab] = useState<InputTab>("upload");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [pastedText, setPastedText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
 
-  /* options */
+  /* options — pre-fill gender from profile */
   const [myGender, setMyGender] = useState<Gender>("male");
   const [partnerGender, setPartnerGender] = useState<Gender>("female");
   const [deepPsychology, setDeepPsychology] = useState(false);
   const [detectSarcasm, setDetectSarcasm] = useState(false);
   const [datingAdvice, setDatingAdvice] = useState(true);
+
+  useEffect(() => {
+    if (user?.gender) setMyGender(user.gender);
+  }, [user?.gender]);
 
   /* analysis state */
   const [phase, setPhase] = useState<DashPhase>("input");
@@ -149,10 +166,7 @@ export default function DashboardPage() {
       e.preventDefault();
       setIsDragging(false);
       const file = e.dataTransfer.files[0];
-      if (
-        file &&
-        (file.name.endsWith(".json") || file.name.endsWith(".txt"))
-      ) {
+      if (file && (file.name.endsWith(".json") || file.name.endsWith(".txt"))) {
         setUploadedFile(file);
         toast.success("File uploaded");
       } else if (file) {
@@ -165,10 +179,7 @@ export default function DashboardPage() {
   const onFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (
-        file &&
-        (file.name.endsWith(".json") || file.name.endsWith(".txt"))
-      ) {
+      if (file && (file.name.endsWith(".json") || file.name.endsWith(".txt"))) {
         setUploadedFile(file);
         toast.success("File uploaded");
       } else if (file) {
@@ -187,16 +198,30 @@ export default function DashboardPage() {
   const removeFile = () => setUploadedFile(null);
 
   const hasInput =
-    inputMode === "upload" ? !!uploadedFile : pastedText.trim().length > 0;
+    inputTab === "upload" ? !!uploadedFile : inputTab === "paste" ? pastedText.trim().length > 0 : false;
+
+  /* ── Pro gate helper ── */
+  const handleProToggle = (current: boolean, setter: (v: boolean) => void) => {
+    if (!current && !isPro) {
+      toast.error("This is a Pro feature. Upgrade to unlock.");
+      return;
+    }
+    setter(!current);
+  };
 
   /* ── Run Analysis ── */
   const runAnalysis = async () => {
     if (!hasInput) {
       toast.error(
-        inputMode === "upload"
+        inputTab === "upload"
           ? "Please upload a .txt or .json file first"
           : "Please paste your conversation text first"
       );
+      return;
+    }
+
+    if ((deepPsychology || detectSarcasm) && !isPro) {
+      toast.error("Pro features are enabled. Please upgrade or disable them.");
       return;
     }
 
@@ -204,7 +229,7 @@ export default function DashboardPage() {
 
     try {
       let chatText = "";
-      if (inputMode === "upload" && uploadedFile) {
+      if (inputTab === "upload" && uploadedFile) {
         chatText = await uploadedFile.text();
       } else {
         chatText = pastedText;
@@ -261,7 +286,7 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: newMessages,
-          contextText,
+          contextText: contextText || undefined,
         }),
       });
       const data = await res.json();
@@ -345,28 +370,35 @@ export default function DashboardPage() {
                 <div className="mt-6 rounded-2xl bg-white/5 border border-white/10 p-5 space-y-4">
                   <Toggle
                     enabled={deepPsychology}
-                    onToggle={() => setDeepPsychology(!deepPsychology)}
+                    onToggle={() => handleProToggle(deepPsychology, setDeepPsychology)}
                     label="Deep Psychology Mode"
+                    locked={!isPro}
                   />
                   <Toggle
                     enabled={detectSarcasm}
-                    onToggle={() => setDetectSarcasm(!detectSarcasm)}
+                    onToggle={() => handleProToggle(detectSarcasm, setDetectSarcasm)}
                     label="Detect Sarcasm"
+                    locked={!isPro}
                   />
                   <Toggle
                     enabled={datingAdvice}
                     onToggle={() => setDatingAdvice(!datingAdvice)}
                     label="Include Dating Advice"
                   />
+                  {!isPro && (
+                    <Link href="/pricing" className="inline-flex items-center gap-2 text-xs text-amber-400 hover:text-amber-300 transition-colors mt-1">
+                      <Crown className="w-3.5 h-3.5" /> Upgrade to Pro to unlock all features
+                    </Link>
+                  )}
                 </div>
 
-                {/* Tab switcher */}
-                <div className="mt-8 flex rounded-xl bg-white/5 border border-white/10 p-1 mb-4 w-fit">
+                {/* Tab switcher — 3 modes */}
+                <div className="mt-8 flex flex-wrap rounded-xl bg-white/5 border border-white/10 p-1 mb-4 w-fit gap-0">
                   <button
                     type="button"
-                    onClick={() => setInputMode("upload")}
+                    onClick={() => setInputTab("upload")}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      inputMode === "upload"
+                      inputTab === "upload"
                         ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
                         : "text-zinc-400 hover:text-zinc-200"
                     }`}
@@ -376,9 +408,9 @@ export default function DashboardPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setInputMode("paste")}
+                    onClick={() => setInputTab("paste")}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      inputMode === "paste"
+                      inputTab === "paste"
                         ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
                         : "text-zinc-400 hover:text-zinc-200"
                     }`}
@@ -386,10 +418,22 @@ export default function DashboardPage() {
                     <MessageSquareText className="w-4 h-4" />
                     Paste Text
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setInputTab("coach")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      inputTab === "coach"
+                        ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    AI Coach
+                  </button>
                 </div>
 
                 {/* Upload zone */}
-                {inputMode === "upload" && (
+                {inputTab === "upload" && (
                   <div
                     onDrop={onDrop}
                     onDragOver={onDragOver}
@@ -462,7 +506,7 @@ export default function DashboardPage() {
                 )}
 
                 {/* Paste zone */}
-                {inputMode === "paste" && (
+                {inputTab === "paste" && (
                   <div className="rounded-2xl backdrop-blur-2xl bg-blue-500/5 border border-white/10 overflow-hidden">
                     <textarea
                       value={pastedText}
@@ -490,24 +534,84 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Analyze button */}
-                <div className="mt-5 flex flex-col sm:flex-row gap-3">
-                  <button
-                    type="button"
-                    onClick={runAnalysis}
-                    disabled={!hasInput}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-500 text-white shadow-lg shadow-blue-500/25 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-                  >
-                    Analyze
-                    <ArrowRight className="h-5 w-5" />
-                  </button>
-                  <Link
-                    href="/history"
-                    className="inline-flex items-center justify-center rounded-2xl px-6 py-4 text-base font-semibold bg-white/5 border border-white/10 text-zinc-100 hover:bg-white/10 transition-all"
-                  >
-                    Past Reports
-                  </Link>
-                </div>
+                {/* AI Coach — standalone chat */}
+                {inputTab === "coach" && (
+                  <div className="rounded-2xl backdrop-blur-2xl bg-blue-500/5 border border-white/10 overflow-hidden">
+                    <div className="p-5 border-b border-white/10">
+                      <h3 className="text-lg font-bold text-zinc-100">AI Relationship Coach</h3>
+                      <p className="text-xs text-zinc-500 mt-1">
+                        {contextText ? "Chatting with context from your last analysis." : "Ask any relationship or dating question."}
+                      </p>
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto p-5 space-y-4">
+                      {chatMessages.length === 0 && (
+                        <div className="text-center text-sm text-zinc-600 py-8">
+                          Ask anything — &quot;How do I start a conversation?&quot;, &quot;Is double texting bad?&quot;
+                        </div>
+                      )}
+                      {chatMessages.map((m, i) => (
+                        <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                          <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
+                            m.role === "user"
+                              ? "bg-blue-500/20 text-zinc-100 border border-blue-500/30"
+                              : "bg-white/5 text-zinc-300 border border-white/10"
+                          }`}>
+                            {m.content}
+                          </div>
+                        </div>
+                      ))}
+                      {chatLoading && (
+                        <div className="flex justify-start">
+                          <div className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
+                            <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+                    <div className="p-4 border-t border-white/10">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+                          placeholder="Ask the AI coach..."
+                          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-blue-500/40"
+                        />
+                        <button
+                          type="button"
+                          onClick={sendChat}
+                          disabled={chatLoading || !chatInput.trim()}
+                          className="px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white disabled:opacity-50 transition-opacity"
+                        >
+                          <Send className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Analyze button — only show for upload/paste tabs */}
+                {inputTab !== "coach" && (
+                  <div className="mt-5 flex flex-col sm:flex-row gap-3 sticky bottom-4 z-10">
+                    <button
+                      type="button"
+                      onClick={runAnalysis}
+                      disabled={!hasInput}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold bg-gradient-to-r from-blue-600 via-indigo-500 to-cyan-500 text-white shadow-lg shadow-blue-500/25 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    >
+                      Analyze
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
+                    <Link
+                      href="/history"
+                      className="inline-flex items-center justify-center rounded-2xl px-6 py-4 text-base font-semibold bg-white/5 border border-white/10 text-zinc-100 hover:bg-white/10 transition-all"
+                    >
+                      Past Reports
+                    </Link>
+                  </div>
+                )}
               </motion.div>
             )}
 

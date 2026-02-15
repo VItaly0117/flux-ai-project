@@ -1,9 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
-const SYSTEM_INSTRUCTION = `You are a dating coach and relationship advisor. You have read the user's chat history (provided as context below). 
+const SYSTEM_WITH_CONTEXT = `You are a dating coach and relationship advisor. You have read the user's chat history (provided as context below). 
 
 Answer their follow-up questions based specifically on that conversation context. Be direct, practical, and concise. Give actionable advice. If they ask "how should I reply?", suggest an actual message they could send. Keep responses under 200 words unless they ask for detail.`;
+
+const SYSTEM_STANDALONE = `You are an expert dating coach and relationship advisor. Users come to you with dating questions, relationship problems, and communication challenges.
+
+Be direct, practical, and concise. Give actionable advice with specific examples when possible. Keep responses under 200 words unless they ask for detail.`;
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -31,12 +35,13 @@ export async function POST(request: Request) {
       );
     }
 
+    const hasContext = !!contextText && contextText.trim().length > 0;
     const truncatedContext = (contextText || "").slice(0, 20_000);
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: hasContext ? SYSTEM_WITH_CONTEXT : SYSTEM_STANDALONE,
     });
 
     // Build conversation history for Gemini
@@ -45,26 +50,29 @@ export async function POST(request: Request) {
       parts: [{ text: m.content }],
     }));
 
+    const contextHistory = hasContext
+      ? [
+          {
+            role: "user" as const,
+            parts: [
+              {
+                text: `Here is the chat log I want to discuss:\n\n${truncatedContext}\n\n---\nI'll now ask you questions about this conversation.`,
+              },
+            ],
+          },
+          {
+            role: "model" as const,
+            parts: [
+              {
+                text: "I've read through the chat log. I'm ready to answer your questions about this conversation. What would you like to know?",
+              },
+            ],
+          },
+        ]
+      : [];
+
     const chat = model.startChat({
-      history: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Here is the chat log I want to discuss:\n\n${truncatedContext}\n\n---\nI'll now ask you questions about this conversation.`,
-            },
-          ],
-        },
-        {
-          role: "model",
-          parts: [
-            {
-              text: "I've read through the chat log. I'm ready to answer your questions about this conversation. What would you like to know?",
-            },
-          ],
-        },
-        ...chatHistory,
-      ],
+      history: [...contextHistory, ...chatHistory],
     });
 
     const lastMessage = messages[messages.length - 1].content;

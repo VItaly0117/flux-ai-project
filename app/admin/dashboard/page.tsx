@@ -1,24 +1,44 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Users, DollarSign, Shield, ToggleLeft } from "lucide-react";
-import { useState } from "react";
+import { Users, Crown, Shield, ToggleLeft, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/utils/supabase/client";
 
-const MOCK_USERS = [
-  { id: "1", email: "user1@example.com", plan: "Free", joined: "2024-01-15" },
-  { id: "2", email: "user2@example.com", plan: "Pro", joined: "2024-02-20" },
-  { id: "3", email: "user3@example.com", plan: "Free", joined: "2024-03-10" },
-  { id: "4", email: "admin@flux.app", plan: "Admin", joined: "2024-01-01" },
-];
+interface ProfileRow {
+  id: string;
+  name: string | null;
+  role: string | null;
+  is_pro: boolean | null;
+  created_at: string | null;
+}
 
-const MOCK_FEATURES = [
+const FEATURES_INIT = [
   { id: "beta_chat", label: "Beta Chat Mode", enabled: true },
   { id: "telegram_upload", label: "Telegram Context Upload", enabled: true },
   { id: "premium_tone", label: "Premium Tone Detection", enabled: false },
 ];
 
 export default function AdminDashboardPage() {
-  const [features, setFeatures] = useState(MOCK_FEATURES);
+  const supabase = useMemo(() => createClient(), []);
+  const [profiles, setProfiles] = useState<ProfileRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [features, setFeatures] = useState(FEATURES_INIT);
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, name, role, is_pro, created_at")
+        .order("created_at", { ascending: false });
+      setProfiles((data as ProfileRow[]) ?? []);
+      setLoading(false);
+    };
+    void load();
+  }, [supabase]);
+
+  const totalUsers = profiles.length;
+  const proUsers = profiles.filter((p) => p.is_pro).length;
 
   const toggleFeature = (id: string) => {
     setFeatures((prev) =>
@@ -53,21 +73,21 @@ export default function AdminDashboardPage() {
               <Users className="w-5 h-5 text-blue-400" />
               <span className="text-sm text-zinc-500">Total Users</span>
             </div>
-            <p className="text-2xl font-bold text-zinc-100">1,247</p>
+            <p className="text-2xl font-bold text-zinc-100">{loading ? "..." : totalUsers}</p>
           </div>
           <div className="rounded-2xl backdrop-blur-2xl bg-blue-500/5 border border-white/10 shadow-lg shadow-blue-500/10 p-6">
             <div className="flex items-center gap-3 mb-2">
-              <DollarSign className="w-5 h-5 text-cyan-400" />
-              <span className="text-sm text-zinc-500">Revenue (MTD)</span>
+              <Crown className="w-5 h-5 text-cyan-400" />
+              <span className="text-sm text-zinc-500">Pro Users</span>
             </div>
-            <p className="text-2xl font-bold text-zinc-100">$12,840</p>
+            <p className="text-2xl font-bold text-zinc-100">{loading ? "..." : proUsers}</p>
           </div>
           <div className="rounded-2xl backdrop-blur-2xl bg-blue-500/5 border border-white/10 shadow-lg shadow-blue-500/10 p-6 sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-3 mb-2">
               <Shield className="w-5 h-5 text-indigo-400" />
-              <span className="text-sm text-zinc-500">Pro Users</span>
+              <span className="text-sm text-zinc-500">Free Users</span>
             </div>
-            <p className="text-2xl font-bold text-zinc-100">312</p>
+            <p className="text-2xl font-bold text-zinc-100">{loading ? "..." : totalUsers - proUsers}</p>
           </div>
         </motion.div>
 
@@ -80,40 +100,53 @@ export default function AdminDashboardPage() {
         >
           <div className="p-6 border-b border-white/10">
             <h2 className="text-lg font-semibold text-zinc-100">User Management</h2>
-            <p className="text-sm text-zinc-500">Recent users</p>
+            <p className="text-sm text-zinc-500">{totalUsers} registered users</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Email</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Plan</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Joined</th>
-                </tr>
-              </thead>
-              <tbody>
-                {MOCK_USERS.map((u) => (
-                  <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 text-zinc-200">{u.email}</td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                          u.plan === "Admin"
-                            ? "bg-indigo-500/20 text-indigo-400"
-                            : u.plan === "Pro"
-                            ? "bg-blue-500/20 text-blue-400"
-                            : "bg-zinc-500/20 text-zinc-400"
-                        }`}
-                      >
-                        {u.plan}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-zinc-500">{u.joined}</td>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-cyan-400" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Name</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Plan</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Role</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Joined</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {profiles.map((p) => {
+                    const plan = p.role === "admin" ? "Admin" : p.is_pro ? "Pro" : "Free";
+                    return (
+                      <tr key={p.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="px-6 py-4 text-zinc-200">{p.name || "—"}</td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                              plan === "Admin"
+                                ? "bg-indigo-500/20 text-indigo-400"
+                                : plan === "Pro"
+                                  ? "bg-blue-500/20 text-blue-400"
+                                  : "bg-zinc-500/20 text-zinc-400"
+                            }`}
+                          >
+                            {plan}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-zinc-500 text-xs">{p.role || "user"}</td>
+                        <td className="px-6 py-4 text-zinc-500 text-xs">
+                          {p.created_at ? new Date(p.created_at).toLocaleDateString() : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </motion.div>
 
         {/* Feature Toggles */}

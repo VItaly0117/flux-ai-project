@@ -41,9 +41,13 @@ export async function updateSession(request: NextRequest): Promise<{
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: User | null = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // Token refresh failed — treat as unauthenticated but don't crash
+  }
 
   return { response, user };
 }
