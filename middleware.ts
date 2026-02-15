@@ -5,10 +5,12 @@ function applySecurityHeaders(response: NextResponse) {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin");
+  response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   return response;
 }
 
 const PROTECTED_ROUTES = ["/admin", "/dashboard", "/history", "/saved", "/profile", "/analyze"];
+const PUBLIC_ROUTES = ["/", "/login", "/signup", "/pricing", "/privacy"];
 
 export async function middleware(request: NextRequest) {
   // Let the signout route pass through without session logic
@@ -16,17 +18,29 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(NextResponse.next());
   }
 
-  // Single Supabase call — refreshes tokens and returns user + response with cookies
-  const { response, user } = await updateSession(request);
+  const pathname = request.nextUrl.pathname;
+  const isProtected = PROTECTED_ROUTES.some((r) => pathname.startsWith(r));
+  const isPublic = PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+
+  let response: NextResponse;
+  let user: unknown;
+  try {
+    // Single Supabase call — refreshes tokens and returns user + response with cookies
+    const result = await updateSession(request);
+    response = result.response;
+    user = result.user;
+  } catch (err) {
+    console.log("[Middleware] updateSession error", err);
+    response = NextResponse.next();
+    user = null;
+  }
 
   applySecurityHeaders(response);
 
   // Protect routes — redirect to /login if no session
-  const isProtected = PROTECTED_ROUTES.some((r) => request.nextUrl.pathname.startsWith(r));
-
   if (!user && isProtected) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", request.nextUrl.pathname);
+    loginUrl.searchParams.set("next", pathname);
     const redirect = NextResponse.redirect(loginUrl);
     // CRITICAL: copy refreshed cookies to the redirect response
     copyCookies(response, redirect);
@@ -34,10 +48,15 @@ export async function middleware(request: NextRequest) {
   }
 
   // Already logged in — bounce away from auth pages
-  if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup")) {
+  if (user && (pathname === "/login" || pathname === "/signup")) {
     const redirect = NextResponse.redirect(new URL("/dashboard", request.url));
     copyCookies(response, redirect);
     return applySecurityHeaders(redirect);
+  }
+
+  // If request is neither public nor protected, still avoid caching to reduce weird session edge cases
+  if (!isPublic && !isProtected) {
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   }
 
   return response;

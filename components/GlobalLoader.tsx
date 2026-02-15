@@ -7,15 +7,33 @@ export function GlobalLoader() {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    const hide = () => setIsVisible(false);
+    let didHide = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    if (document.readyState === "complete") {
+    const hide = () => {
+      if (didHide) return;
+      didHide = true;
+      setIsVisible(false);
+    };
+
+    if (document.readyState === "complete" || document.readyState === "interactive") {
       hide();
       return;
     }
 
+    window.addEventListener("DOMContentLoaded", hide, { once: true });
     window.addEventListener("load", hide, { once: true });
-    return () => window.removeEventListener("load", hide);
+
+    // Fallback: never block the UI longer than 3s
+    timeoutId = setTimeout(() => {
+      hide();
+    }, 3000);
+
+    return () => {
+      window.removeEventListener("DOMContentLoaded", hide);
+      window.removeEventListener("load", hide);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   return (

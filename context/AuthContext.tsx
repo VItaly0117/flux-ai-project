@@ -51,55 +51,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const hasRecovered = useRef(false);
+  const mountedRef = useRef(false);
+  const recoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const ADMIN_EMAILS = ["admin@flux.com", "boss@flux.com"];
 
   const mapUser = useCallback(async (sbUser: SupabaseUser | null): Promise<User | null> => {
-    if (!sbUser) return null;
+    try {
+      if (!sbUser) return null;
 
-    const isHardcodedAdmin = !!sbUser.email && ADMIN_EMAILS.includes(sbUser.email);
+      const isHardcodedAdmin = !!sbUser.email && ADMIN_EMAILS.includes(sbUser.email);
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, role, name, gender, bio, is_pro")
-      .eq("id", sbUser.id)
-      .maybeSingle<ProfileRow>();
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("id, role, name, gender, bio, is_pro")
+        .eq("id", sbUser.id)
+        .maybeSingle<ProfileRow>();
 
-    const role: UserRole = isHardcodedAdmin ? "admin" : (profile?.role === "admin" ? "admin" : "user");
+      if (error) {
+        console.log("[Auth] mapUser: profile fetch error", error.message);
+      }
 
-    return {
-      id: sbUser.id,
-      email: sbUser.email ?? "",
-      name: profile?.name ?? undefined,
-      role,
-      gender: (profile?.gender as Gender) ?? undefined,
-      bio: profile?.bio ?? undefined,
-      is_pro: !!profile?.is_pro,
-    } satisfies User;
+      const role: UserRole = isHardcodedAdmin ? "admin" : (profile?.role === "admin" ? "admin" : "user");
+
+      return {
+        id: sbUser.id,
+        email: sbUser.email ?? "",
+        name: profile?.name ?? undefined,
+        role,
+        gender: (profile?.gender as Gender) ?? undefined,
+        bio: profile?.bio ?? undefined,
+        is_pro: !!profile?.is_pro,
+      } satisfies User;
+    } catch (err) {
+      console.log("[Auth] mapUser: unexpected error", err);
+      if (!sbUser) return null;
+      return {
+        id: sbUser.id,
+        email: sbUser.email ?? "",
+        role: "user",
+        is_pro: false,
+      } satisfies User;
+    }
   }, [supabase]);
 
   // Main effect: init session + subscribe to auth events
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
 
     const init = async () => {
       setIsLoading(true);
-
-      // getUser() validates the token server-side (more reliable than getSession)
-      const { data: { user: sbUser } } = await supabase.auth.getUser();
-      const mapped = await mapUser(sbUser ?? null);
-
-      if (mounted) {
-        setUser(mapped);
-        setIsLoading(false);
+      try {
+        // getUser() validates the token server-side (more reliable than getSession)
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          console.log("[Auth] init getUser error", error.message);
+        }
+        const mapped = await mapUser(data?.user ?? null);
+        if (mountedRef.current) {
+          setUser(mapped);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.log("[Auth] init getUser unexpected error", err);
+        if (mountedRef.current) {
+          setUser(null);
+          setIsLoading(false);
+        }
       }
     };
 
     void init();
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[Auth] Event:", event);
       if (event === "SIGNED_OUT") {
-        if (mounted) {
+        if (mountedRef.current) {
           setUser(null);
           setIsLoading(false);
           hasRecovered.current = false;
@@ -113,10 +140,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         event === "TOKEN_REFRESHED" ||
         event === "USER_UPDATED"
       ) {
-        const mapped = await mapUser(session?.user ?? null);
-        if (mounted) {
-          setUser(mapped);
-          setIsLoading(false);
+        try {
+          const mapped = await mapUser(session?.user ?? null);
+          if (mountedRef.current) {
+            setUser(mapped);
+            setIsLoading(false);
+          }
+        } catch (err) {
+          console.log("[Auth] event mapUser error", err);
+          if (mountedRef.current) {
+            setUser(null);
+            setIsLoading(false);
+          }
         }
         // Sync Server Components so they see the fresh session/role
         router.refresh();
@@ -124,15 +159,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // INITIAL_SESSION or any other event
-      const mapped = await mapUser(session?.user ?? null);
-      if (mounted) {
-        setUser(mapped);
-        setIsLoading(false);
+      try {
+        const mapped = await mapUser(session?.user ?? null);
+        if (mountedRef.current) {
+          setUser(mapped);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.log("[Auth] initial mapUser error", err);
+        if (mountedRef.current) {
+          setUser(null);
+          setIsLoading(false);
+        }
       }
     });
 
     return () => {
-      mounted = false;
+      mountedRef.current = false;
+      if (recoveryTimeoutRef.current) {
+        clearTimeout(recoveryTimeoutRef.current);
+        recoveryTimeoutRef.current = null;
+      }
       sub.subscription.unsubscribe();
     };
   }, [mapUser, router, supabase]);
@@ -146,24 +193,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
 
+    if (recoveryTimeoutRef.current) {
+      clearTimeout(recoveryTimeoutRef.current);
+      recoveryTimeoutRef.current = null;
+    }
+
     const recover = async () => {
       try {
-        const { data: { user: sbUser } } = await supabase.auth.getUser();
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          console.log("[Auth] recover getUser error", error.message);
+        }
+        const sbUser = data?.user;
         if (cancelled || !sbUser) return;
 
         const mapped = await mapUser(sbUser);
-        if (!cancelled && mapped) {
+        if (!cancelled && mountedRef.current && mapped) {
           setUser(mapped);
           router.refresh();
         }
-      } catch {
-        // no session to recover — ignore
+      } catch (err) {
+        console.log("[Auth] recover unexpected error", err);
       }
     };
 
-    void recover();
+    recoveryTimeoutRef.current = setTimeout(() => {
+      void recover();
+    }, 1000);
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (recoveryTimeoutRef.current) {
+        clearTimeout(recoveryTimeoutRef.current);
+        recoveryTimeoutRef.current = null;
+      }
+    };
   }, [isLoading, user, mapUser, router, supabase]);
 
   const login = useCallback(async (email: string, password: string) => {
