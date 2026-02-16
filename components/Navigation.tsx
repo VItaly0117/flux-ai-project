@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Home, LayoutDashboard, History, Upload, User, Shield, LogOut, Menu, X } from "lucide-react";
+import { Home, LayoutDashboard, History, Upload, User, Shield, LogOut, Menu, X, Crown } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -11,6 +11,7 @@ const baseNavItems = [
   { icon: Home, label: "Home", href: "/" },
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: History, label: "Reports", href: "/history" },
+  { icon: Crown, label: "Pricing", href: "/pricing" },
   { icon: User, label: "Profile", href: "/settings" },
 ];
 
@@ -35,11 +36,10 @@ function UserProfileCard({ user, compact = false }: { user: { email: string; nam
   return (
     <div className={`flex items-center gap-3 ${compact ? "px-4 py-3" : "px-4 py-3"}`}>
       <div
-        className={`flex-shrink-0 flex items-center justify-center rounded-full font-bold text-white ${
-          isAdmin
+        className={`flex-shrink-0 flex items-center justify-center rounded-full font-bold text-white ${isAdmin
             ? "bg-gradient-to-br from-purple-500 to-amber-400 shadow-lg shadow-purple-500/25"
             : "bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-blue-500/25"
-        } ${compact ? "w-9 h-9 text-sm" : "w-10 h-10 text-sm"}`}
+          } ${compact ? "w-9 h-9 text-sm" : "w-10 h-10 text-sm"}`}
       >
         {initial}
       </div>
@@ -50,11 +50,10 @@ function UserProfileCard({ user, compact = false }: { user: { email: string; nam
         </div>
       </div>
       <span
-        className={`flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-          isAdmin
+        className={`flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${isAdmin
             ? "bg-purple-500/20 text-amber-300 border border-purple-500/30"
             : "bg-blue-500/10 text-blue-300 border border-blue-500/20"
-        }`}
+          }`}
       >
         {isAdmin ? "Admin" : "User"}
       </span>
@@ -207,11 +206,10 @@ export function Navigation() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`flex items-center gap-3 rounded-2xl px-4 py-4 text-base font-medium transition-all ${
-                        isActive
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-4 text-base font-medium transition-all ${isActive
                           ? "text-cyan-300 bg-blue-500/15 border border-blue-400/20"
                           : "text-zinc-200 hover:bg-white/5 border border-transparent hover:border-white/10"
-                      }`}
+                        }`}
                     >
                       <Icon className="w-5 h-5" />
                       <span>{item.label}</span>

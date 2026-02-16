@@ -71,14 +71,12 @@ function Toggle({
         {locked && <span className="text-[10px] text-amber-400 font-semibold">PRO</span>}
       </span>
       <div
-        className={`relative w-11 h-6 rounded-full transition-colors ${
-          enabled ? "bg-cyan-500" : "bg-white/10"
-        }`}
+        className={`relative w-11 h-6 rounded-full transition-colors ${enabled ? "bg-cyan-500" : "bg-white/10"
+          }`}
       >
         <div
-          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-            enabled ? "translate-x-5" : "translate-x-0"
-          }`}
+          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-5" : "translate-x-0"
+            }`}
         />
       </div>
     </button>
@@ -91,10 +89,12 @@ function GenderSelector({
   value,
   onChange,
   label,
+  selectorId,
 }: {
   value: Gender;
   onChange: (g: Gender) => void;
   label: string;
+  selectorId: string;
 }) {
   const opts: { val: Gender; lbl: string }[] = [
     { val: "male", lbl: "Male" },
@@ -104,19 +104,23 @@ function GenderSelector({
   return (
     <div>
       <div className="text-xs font-medium text-zinc-500 mb-2">{label}</div>
-      <div className="flex rounded-xl bg-white/5 border border-white/10 p-1">
+      <div className="relative flex rounded-xl bg-white/5 border border-white/10 p-1">
         {opts.map((o) => (
           <button
             key={o.val}
             type="button"
             onClick={() => onChange(o.val)}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-              value === o.val
-                ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30"
-                : "text-zinc-400 hover:text-zinc-200"
-            }`}
+            className="relative flex-1 px-3 py-2 rounded-lg text-sm font-medium z-10 transition-colors duration-200"
+            style={{ color: value === o.val ? "rgb(103, 232, 249)" : "rgb(161, 161, 170)" }}
           >
-            {o.lbl}
+            {value === o.val && (
+              <motion.span
+                layoutId={`gender-pill-${selectorId}`}
+                className="absolute inset-0 rounded-lg bg-blue-500/20 border border-blue-500/30"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+            <span className="relative">{o.lbl}</span>
           </button>
         ))}
       </div>
@@ -373,11 +377,13 @@ export default function DashboardPage() {
                     value={myGender}
                     onChange={setMyGender}
                     label="My Gender"
+                    selectorId="my"
                   />
                   <GenderSelector
                     value={partnerGender}
                     onChange={setPartnerGender}
                     label="Partner's Gender"
+                    selectorId="partner"
                   />
                 </div>
 
@@ -412,11 +418,10 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => setInputTab("upload")}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      inputTab === "upload"
-                        ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${inputTab === "upload"
+                      ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                      }`}
                   >
                     <FileUp className="w-4 h-4" />
                     Upload File
@@ -424,11 +429,10 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => setInputTab("paste")}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      inputTab === "paste"
-                        ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${inputTab === "paste"
+                      ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                      }`}
                   >
                     <MessageSquareText className="w-4 h-4" />
                     Paste Text
@@ -436,11 +440,10 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => setInputTab("coach")}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      inputTab === "coach"
-                        ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
-                        : "text-zinc-400 hover:text-zinc-200"
-                    }`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${inputTab === "coach"
+                      ? "bg-blue-500/20 text-cyan-300 border border-blue-500/30 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                      }`}
                   >
                     <MessageCircle className="w-4 h-4" />
                     AI Coach
@@ -566,11 +569,10 @@ export default function DashboardPage() {
                       )}
                       {chatMessages.map((m, i) => (
                         <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                          <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
-                            m.role === "user"
-                              ? "bg-blue-500/20 text-zinc-100 border border-blue-500/30"
-                              : "bg-white/5 text-zinc-300 border border-white/10"
-                          }`}>
+                          <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${m.role === "user"
+                            ? "bg-blue-500/20 text-zinc-100 border border-blue-500/30"
+                            : "bg-white/5 text-zinc-300 border border-white/10"
+                            }`}>
                             {m.content}
                           </div>
                         </div>
@@ -672,15 +674,14 @@ export default function DashboardPage() {
                         Powered by Gemini AI
                       </p>
                       <span
-                        className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                          summary.toLowerCase().includes("high") ||
+                        className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${summary.toLowerCase().includes("high") ||
                           summary.toLowerCase().includes("mutual")
-                            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                            : summary.toLowerCase().includes("cold") ||
-                                summary.toLowerCase().includes("toxic")
-                              ? "bg-red-500/15 text-red-300 border border-red-500/30"
-                              : "bg-blue-500/15 text-blue-300 border border-blue-500/30"
-                        }`}
+                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                          : summary.toLowerCase().includes("cold") ||
+                            summary.toLowerCase().includes("toxic")
+                            ? "bg-red-500/15 text-red-300 border border-red-500/30"
+                            : "bg-blue-500/15 text-blue-300 border border-blue-500/30"
+                          }`}
                       >
                         {summary}
                       </span>
@@ -853,8 +854,8 @@ export default function DashboardPage() {
                                   cx={
                                     20 +
                                     i *
-                                      (560 /
-                                        Math.max(tonePoints.length - 1, 1))
+                                    (560 /
+                                      Math.max(tonePoints.length - 1, 1))
                                   }
                                   cy={140 - v * 1.2}
                                   r="5"
@@ -921,11 +922,10 @@ export default function DashboardPage() {
                         className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                       >
                         <div
-                          className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
-                            m.role === "user"
-                              ? "bg-blue-500/20 text-zinc-100 border border-blue-500/30"
-                              : "bg-white/5 text-zinc-300 border border-white/10"
-                          }`}
+                          className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${m.role === "user"
+                            ? "bg-blue-500/20 text-zinc-100 border border-blue-500/30"
+                            : "bg-white/5 text-zinc-300 border border-white/10"
+                            }`}
                         >
                           {m.content}
                         </div>
